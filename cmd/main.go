@@ -2,7 +2,10 @@ package main
 
 import (
 	"context"
+	"flag"
 	"fmt"
+	"github.com/alexptdev/auth-api/internal/config"
+	"github.com/alexptdev/auth-api/internal/config/env"
 	desc "github.com/alexptdev/auth-api/pkg/user_v1"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/reflection"
@@ -12,10 +15,20 @@ import (
 	"net"
 )
 
-const grpcPort = 4000
+var configPath string
 
 type userServer struct {
 	desc.UnimplementedUserV1Server
+}
+
+func init() {
+
+	flag.StringVar(
+		&configPath,
+		"config-path",
+		".env",
+		"path to config file",
+	)
 }
 
 func (s *userServer) Create(_ context.Context, req *desc.CreateRequest) (*desc.CreateResponse, error) {
@@ -69,7 +82,24 @@ func (s *userServer) Delete(_ context.Context, req *desc.DeleteRequest) (*emptyp
 
 func main() {
 
-	listen, err := net.Listen("tcp", fmt.Sprintf(":%d", grpcPort))
+	flag.Parse()
+
+	err := config.Load(configPath)
+	if err != nil {
+		log.Fatalf("failed to load config: %v", err)
+	}
+
+	grpcConfig, err := env.NewGrpcConfig()
+	if err != nil {
+		log.Fatalf("failed to get grpc config: %v", err)
+	}
+
+	_, err = env.NewPgConfig()
+	if err != nil {
+		log.Fatalf("failed to get pg config: %v", err)
+	}
+
+	listen, err := net.Listen("tcp", grpcConfig.Address())
 	if err != nil {
 		log.Fatalf("Failed to listen port: %v", err)
 	}
